@@ -1,4 +1,27 @@
-// const crypto = require('crypto');
+const express = require('express')
+const router = express.Router()
+const crypto = require('crypto')
+console.log(crypto)
+
+router.get('/generate-key-pair', (req, res) => {
+    console.log('generate-key-pair route')
+    res.json({data: 'hello-crypto from the crypto file'})
+})
+
+router.post('/hash', (req, res) => {
+    console.log('hash route')
+    console.log(req.body)
+    res.json({data: 'hello-crypto from the crypto file'})
+})
+
+module.exports = router
+
+// hash(string) {
+//     const crypto = require("crypto")
+//     const hash = crypto.createHash('sha256')
+//     hash.update(string)
+//     console.log(hash.digest('hex'))
+//   }
 
 // const PASSPHRASE = 'I had that some things are best kept secret.';
 
@@ -47,13 +70,3 @@
 // } else {
 //     console.log("\n>>> Match: FALSE!");
 // }
-
-const express = require('express')
-const router = express.Router()
-
-
-router.get('/hello-crypto', (req, res) => {
-    res.json({data: 'hello-crypto from the crypto file'})
-})
-
-module.exports = router

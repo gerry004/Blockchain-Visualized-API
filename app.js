@@ -1,22 +1,23 @@
 const express = require('express')
 const app = express()
-const cors = require('cors');
-const port = 3000
 
+//Here we are configuring express to use body-parser as middle-ware.
+const parser = require("body-parser");
+app.use(parser.urlencoded({ extended: false }));
+app.use(parser.json());
+
+// Enable Cross Origin Requests
+const cors = require('cors');
 const options = {
   origin: ['http://localhost:8080', 'http://localhost:3000', 'https://gerry004.github.io']
   }
-
 app.use(cors(options))
 
-app.get('/hello', (req, res) => {
-  console.log("hello world route")
-  res.json({data: 'Hello World!'})
-})
+// Register Routes
 const crypto = require('./crypto')
-
 app.use('/crypto/', crypto)
 
-app.listen(process.env.PORT || port, () => {
-  console.log(`Listening at http://localhost:${port}`)
+// Start Listening on Port
+app.listen(process.env.PORT || 3000, () => {
+  console.log('Listening at http://localhost:3000')
 })
