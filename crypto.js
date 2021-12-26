@@ -1,29 +1,25 @@
 const express = require('express')
 const router = express.Router()
 const crypto = require('crypto')
+const Account = require('./account')
 
-router.get('/generate-key-pair', (req, res) => {
-  const passphrase = "What is a passphrase?"
+let ACCOUNTS_MAPPING = {}
 
-  const keyPairOptions = {
-    modulusLength: 2048,
-    publicKeyEncoding: {
-      type: 'spki',
-      format: 'pem'
-    },
-    privateKeyEncoding: {
-      type: 'pkcs8',
-      format: 'pem',
-      cipher: 'aes-256-cbc',
-      passphrase: passphrase
-    }
+router.post('/create-account', (req, res) => {
+  const passphrase = req.body.passphrase
+  
+  if (passphrase) {
+    const keyPair = generateKeyPair(passphrase)
+    const publicKey = keyPair.publicKey
+    const privateKey = keyPair.privateKey
+
+    const account = new Account(publicKey, privateKey, passphrase)
+    ACCOUNTS_MAPPING[publicKey] = account
+    res.json({ balance: 0, public: publicKey, private: privateKey })
   }
-  
-  const keyPair = crypto.generateKeyPairSync('rsa', keyPairOptions);
-  
-  const privateKey = keyPair.privateKey;
-  const publicKey = keyPair.publicKey;
-  res.json({privateKey: privateKey, publicKey: publicKey})
+  else {
+    res.status('400').send('Passphrase is required to create an account.')
+  }
 })
 
 router.post('/hash', (req, res) => {
@@ -43,6 +39,24 @@ function sortObjectByKey(unorderedObject) {
     {}
   );
   return ordered
+}
+
+function generateKeyPair(passphrase) {
+  const keyPairOptions = {
+    modulusLength: 520,
+    publicKeyEncoding: {
+      type: 'spki',
+      format: 'pem'
+    },
+    privateKeyEncoding: {
+      type: 'pkcs8',
+      format: 'pem',
+      cipher: 'aes-256-cbc',
+      passphrase: passphrase
+    }
+  }
+  const keyPair = crypto.generateKeyPairSync('rsa', keyPairOptions)
+  return { privateKey: keyPair.privateKey, publicKey: keyPair.publicKey }
 }
 
 module.exports = router
