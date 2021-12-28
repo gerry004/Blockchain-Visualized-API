@@ -14,7 +14,7 @@ const options = {
 app.use(cors(options))
 
 // Register Routes
-const crypto = require('./crypto')
+const crypto = require('./endpoints')
 app.use('/crypto/', crypto)
 
 // Start Listening on Port
