@@ -3,6 +3,7 @@ const router = express.Router()
 const Account = require('./classes/account')
 const Transaction = require('./classes/transaction')
 const helper = require('./helpers')
+const crypto = require('crypto')
 
 let ACCOUNTS = {}
 
@@ -29,13 +30,29 @@ router.post('/create-account', (req, res) => {
 router.post('/sign', (req, res) => {
   const data = req.body
   const transaction = new Transaction(data.to, data.from, data.amount)
-
-  const hashedData = helper.hash(transaction)
+  const transactionToHash = { to: transaction.to, from: transaction.from, amount: transaction.amount }
+  
+  const hashedData = helper.hash(transactionToHash)
   const hashedPassphrase = helper.hash(data.passphrase)
 
   const signature = ACCOUNTS[hashedPassphrase].signTransaction(hashedData, hashedPassphrase)
-  transaction.setSignature(signature.toString('base64'))
-  res.json(transaction)
+  transaction.setSignature(signature)
+  res.status('200').json(transaction)
+})
+
+router.post('/verify', (req, res) => {
+  const transaction = req.body
+  const transactionToHash = { to: transaction.to, from: transaction.from, amount: transaction.amount }
+  const hashedData = helper.hash(transactionToHash)
+  const decrypted = crypto.publicDecrypt(transaction.from, Buffer.from(transaction.signature, 'base64')).toString()
+  if (hashedData == decrypted) {
+    console.log('Transaction Verified!')
+    transaction.isVerified = true
+    res.status('200').json(transaction)
+  }
+  else {
+    res.status('400').send('Transaction is not verified.')
+  }
 })
 
 // req.body = { to: public, from: public, amount: number }
