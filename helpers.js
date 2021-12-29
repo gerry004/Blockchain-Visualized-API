@@ -13,7 +13,7 @@ function sortObjectByKey(unorderedObject) {
 
 function generateKeyPair(passphrase) {
   const keyPairOptions = {
-    modulusLength: 520,
+    modulusLength: 2048,
     publicKeyEncoding: {
       type: 'spki',
       format: 'pem'
@@ -29,4 +29,18 @@ function generateKeyPair(passphrase) {
   return { privateKey: keyPair.privateKey, publicKey: keyPair.publicKey }
 }
 
-module.exports = generateKeyPair
+function hash(data) {
+  const hash = crypto.createHash('sha256')
+
+  if (typeof(data) == "object") {
+    const orderedObject = sortObjectByKey(data)
+    hash.update(JSON.stringify(orderedObject))
+    return hash.digest('hex')
+  }
+  else {
+    hash.update(JSON.stringify(data))
+    return hash.digest('hex')
+  }
+}
+
+module.exports = { generateKeyPair, hash }

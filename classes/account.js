@@ -1,4 +1,4 @@
-// const crypto = require('crypto')
+const crypto = require('crypto')
 
 class Account {
   constructor(publicKey, privateKey) {
@@ -6,15 +6,11 @@ class Account {
     this.publicKey = publicKey
     this.privateKey = privateKey
   }
-
-  // data = { amount: number, publicAddress: fromPublicAddress }
-  // -> data = { amount: number, publicAddress: fromPublicAddress, signature: privatelyEncrypted }
-  // const signTransaction = (data) => {
-  //   const amount = data[amount]
-  //   const signature = crypto.privateEncrypt({key: privateKey, passphrase: passphrase}, Buffer.from(amount))
-  //   data[signature] = signature
-  //   return data
-  // }
+  // data = { hashedData, hashedPassphrase }
+  signTransaction(data, passphrase) {
+    const signature = crypto.privateEncrypt({key: this.privateKey, passphrase: passphrase}, Buffer.from(data, 'utf-8'))
+    return signature
+  }
 
   // data = { amount: number, publicAddress: fromPublicAddress, signature: privatelyEncrypted }
   // -> boolean

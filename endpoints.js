@@ -1,24 +1,41 @@
 const express = require('express')
 const router = express.Router()
 const Account = require('./classes/account')
-const generateKeyPair = require('./helpers')
+const Transaction = require('./classes/transaction')
+const helper = require('./helpers')
 
-// let ACCOUNTS_MAPPING = {}
+let ACCOUNTS = {}
 
 router.post('/create-account', (req, res) => {
   const passphrase = req.body.passphrase
 
   if (passphrase) {
-    const keyPair = generateKeyPair(passphrase)
+    const keyPair = helper.generateKeyPair(helper.hash(passphrase))
     const publicKey = keyPair.publicKey
     const privateKey = keyPair.privateKey
 
     const account = new Account(publicKey, privateKey)
+
+    const hashedPassphrase = helper.hash(passphrase)
+    ACCOUNTS[hashedPassphrase] = account
+
     res.json(account)
   }
   else {
     res.status('400').send('Passphrase is required to create an account.')
   }
+})
+
+router.post('/sign', (req, res) => {
+  const data = req.body
+  const transaction = new Transaction(data.to, data.from, data.amount)
+
+  const hashedData = helper.hash(transaction)
+  const hashedPassphrase = helper.hash(data.passphrase)
+
+  const signature = ACCOUNTS[hashedPassphrase].signTransaction(hashedData, hashedPassphrase)
+  transaction.setSignature(signature.toString('base64'))
+  res.json(transaction)
 })
 
 // req.body = { to: public, from: public, amount: number }
