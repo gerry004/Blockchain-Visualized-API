@@ -4,7 +4,6 @@ const Account = require('./classes/account')
 const Transaction = require('./classes/transaction')
 const helper = require('./helpers')
 const crypto = require('crypto')
-const { send } = require('process')
 
 let ACCOUNTS = {}
 
@@ -12,14 +11,16 @@ router.post('/create-account', (req, res) => {
   const username = req.body.username
   const passphrase = req.body.passphrase
 
-  if (passphrase && username) {
-    const passphraseHash = helper.hash(passphrase)
-    const keyPair = helper.generateKeyPair(passphraseHash)
-    const publicKey = keyPair.publicKey
-    const privateKey = keyPair.privateKey
+  if (ACCOUNTS[username]) {
+    res.statusMessage = "Username Already Exists."
+    res.status('400').end()
+    return
+  }
 
-    const account = new Account(username, publicKey, privateKey)
-    account.setPassphrase(passphraseHash)
+  if (passphrase && username) {
+    const keyPair = helper.generateKeyPair(passphrase)
+    const account = new Account(username, keyPair.publicKey, keyPair.privateKey)
+    account.setPassphrase(passphrase)
     ACCOUNTS[username] = account
 
     res.status('200').json(account)
@@ -31,62 +32,81 @@ router.post('/create-account', (req, res) => {
 })
 
 router.post('/sign', (req, res) => {
-  const data = req.body
+  const to = req.body.to
+  const from = req.body.from
+  const amount = req.body.amount
+  const passphrase = req.body.passphrase
 
-  if (data.amount <= 0) {
+  if (amount <= 0) {
     res.statusMessage = 'ValueError: Amount Can Not Be Less Than Zero'
     res.status('400').end()
     return
   }
-  if (data.to == data.from) {
+  if (to == from) {
     res.statusMessage = 'Cannot Send Funds to Yourself'
     res.status('400').end()
     return
   }
 
-  const transaction = new Transaction(data.to, data.from, data.amount)
-  const transactionToHash = { to: transaction.to, from: transaction.from, amount: transaction.amount }
-
-  const hashedData = helper.hash(transactionToHash)
-  const passphraseHash = helper.hash(data.passphrase)
-
-  const signature = ACCOUNTS[transaction.from].signTransaction(hashedData, passphraseHash)
-  transaction.setSignature(signature)
-
-  res.status('200').json(transaction)
+  if (ACCOUNTS[to] && ACCOUNTS[from] && passphrase) {
+    const transaction = new Transaction(to, from, amount)
+    const transactionData = { to: to, from: from, amount: amount }
+    const signature = ACCOUNTS[from].signTransaction(transactionData, passphrase)
+    if (signature) {
+      transaction.setSignature(signature)
+      res.status('200').json(transaction)
+      return
+    }
+    else {
+      res.statusMessage = 'Could Not Sign Transaction: Passphrase Incorrect'
+      res.status('400').end()
+      return
+    }
+  }
+  else {
+    res.statusMessage = "Accounts Not Found"
+    res.status('404').end()
+    return
+  }
 })
 
 router.post('/verify', (req, res) => {
-  const transaction = req.body
-  const transactionToHash = { to: transaction.to, from: transaction.from, amount: transaction.amount }
-  const hashedData = helper.hash(transactionToHash)
-  const decrypted = crypto.publicDecrypt(ACCOUNTS[transaction.from].publicKey, Buffer.from(transaction.signature, 'base64')).toString()
-  if (hashedData == decrypted) {
-    console.log('Transaction Verified!')
-    transaction.isVerified = true
-    res.status('200').json(transaction)
+  const data = req.body
+  const transactionData = { to: data.to, from: data.from, amount: data.amount }
+  if (helper.verify(transactionData, ACCOUNTS[data.from].publicKey, data.signature)) {
+    data.isVerified = true
+    res.status('200').json(data)
+    return
   }
   else {
-    res.status('400').send('Transaction is not verified.')
+    res.statusMessage = 'Transaction Unverified'
+    res.status('400').end()
+    return
   }
 })
 
 router.post('/send', (req, res) => {
   const data = req.body
 
-  const receiver = data.to
-  const sender = data.from
+  const receiver = ACCOUNTS[data.to]
+  const sender = ACCOUNTS[data.from]
   const amount = parseInt(data.amount)
+  if (receiver && sender) {
+    const senderBalance = sender.balance
 
-  const senderBalance = ACCOUNTS[sender].balance
-
-  if (senderBalance > amount) {
-    ACCOUNTS[sender].balance -= amount
-    ACCOUNTS[receiver].balance += amount
-    res.status('200').send('Transaction Successful.')
-  } 
+    if (senderBalance > amount) {
+      sender.balance -= amount
+      receiver.balance += amount
+      res.status('200').send('Transaction Successful.')
+    } 
+    else {
+      res.status('400').send('Insufficient Funds.')
+    }
+  }
   else {
-    res.status('400').send('Insufficient Funds.')
+    res.statusMessage = 'Accounts Not Found'
+    res.status('404').end()
+    return
   }
 })
 

@@ -22,7 +22,7 @@ function generateKeyPair(passphrase) {
       type: 'pkcs8',
       format: 'pem',
       cipher: 'aes-256-cbc',
-      passphrase: passphrase
+      passphrase: hash(passphrase)
     }
   }
   const keyPair = crypto.generateKeyPairSync('rsa', keyPairOptions)
@@ -43,4 +43,14 @@ function hash(data) {
   }
 }
 
-module.exports = { generateKeyPair, hash }
+function verify(data, publicKey, signature) {
+  const hashed = hash(data)
+  const decrypted = crypto.publicDecrypt(publicKey, Buffer.from(signature, 'base64')).toString()
+  if (hashed === decrypted) {
+    return true
+  }
+  return false
+
+}
+
+module.exports = { generateKeyPair, hash, verify }

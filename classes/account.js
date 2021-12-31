@@ -1,4 +1,5 @@
 const crypto = require('crypto')
+const helper = require('../helpers')
 
 class Account {
   #passphraseHash = null
@@ -9,16 +10,24 @@ class Account {
     this.publicKey = publicKey
     this.privateKey = privateKey
   }
-  setPassphrase(passphraseHash) {
-    this.#passphraseHash = passphraseHash
+  setPassphrase(passphrase) {
+    this.#passphraseHash = helper.hash(passphrase)
   }
-  signTransaction(data, passphraseHash) {
-    if (passphraseHash == this.#passphraseHash) {
-      const signature = crypto.privateEncrypt({key: this.privateKey, passphrase: passphraseHash}, Buffer.from(data, 'utf8')).toString('base64')
+  authenticatePassphrase(passphrase) {
+    const passphraseHash = helper.hash(passphrase)
+    if (this.#passphraseHash === passphraseHash) {
+      return true
+    }
+    return false
+  }
+  signTransaction(data, passphrase) {
+    if (this.authenticatePassphrase(passphrase)) {
+      const hashedData = helper.hash(data)
+      const signature = crypto.privateEncrypt({key: this.privateKey, passphrase: this.#passphraseHash}, Buffer.from(hashedData, 'utf8')).toString('base64')
       return signature
     }
     else {
-      return 'Passphrase Incorrect.'
+      return false
     }
   }
 }
