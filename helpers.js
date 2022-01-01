@@ -50,7 +50,6 @@ function verify(data, publicKey, signature) {
     return true
   }
   return false
-
 }
 
 module.exports = { generateKeyPair, hash, verify }

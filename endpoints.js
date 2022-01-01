@@ -3,31 +3,34 @@ const router = express.Router()
 const Account = require('./classes/account')
 const Transaction = require('./classes/transaction')
 const helper = require('./helpers')
-const crypto = require('crypto')
+const ApiError = require('./classes/apiError')
 
 let ACCOUNTS = {}
 
 router.post('/create-account', (req, res) => {
   const username = req.body.username
   const passphrase = req.body.passphrase
+  try {
+    if (ACCOUNTS[username]) {
+      throw new ApiError(400, 'Username Already Exists')
+    }
 
-  if (ACCOUNTS[username]) {
-    res.statusMessage = "Username Already Exists."
-    res.status('400').end()
-    return
+    if (passphrase && username) {
+      const keyPair = helper.generateKeyPair(passphrase)
+      const account = new Account(username, keyPair.publicKey, keyPair.privateKey)
+      account.setPassphrase(passphrase)
+      ACCOUNTS[username] = account
+
+      res.status('200').json(account)
+    }
+    else {
+      throw new ApiError(400, 'Username nad Passphrase Required')
+    }
   }
-
-  if (passphrase && username) {
-    const keyPair = helper.generateKeyPair(passphrase)
-    const account = new Account(username, keyPair.publicKey, keyPair.privateKey)
-    account.setPassphrase(passphrase)
-    ACCOUNTS[username] = account
-
-    res.status('200').json(account)
-  }
-  else {
-    res.statusMessage = "Username and passphrase is required to create an account."
-    res.status('400').end()
+  catch(error) {
+    console.log(error)
+    res.statusMessage = error.statusMessage
+    res.status(error.statusCode).end()
   }
 })
 
@@ -36,52 +39,49 @@ router.post('/sign', (req, res) => {
   const from = req.body.from
   const amount = req.body.amount
   const passphrase = req.body.passphrase
-
-  if (amount <= 0) {
-    res.statusMessage = 'ValueError: Amount Can Not Be Less Than Zero'
-    res.status('400').end()
-    return
-  }
-  if (to == from) {
-    res.statusMessage = 'Cannot Send Funds to Yourself'
-    res.status('400').end()
-    return
-  }
-
-  if (ACCOUNTS[to] && ACCOUNTS[from] && passphrase) {
-    const transaction = new Transaction(to, from, amount)
-    const transactionData = { to: to, from: from, amount: amount }
-    const signature = ACCOUNTS[from].signTransaction(transactionData, passphrase)
-    if (signature) {
+  try {
+    if (amount <= 0) {
+      throw new ApiError(400, 'Amount Can Not Be Less Than Zero')
+    }
+    if (to == from) {
+      throw new ApiError(400, 'Can Not Send Funds To Yourself')
+    }
+  
+    if (ACCOUNTS[to] && ACCOUNTS[from]) {
+      const transaction = new Transaction(to, from, amount)
+      const transactionData = { to: to, from: from, amount: amount }
+      const signature = ACCOUNTS[from].signTransaction(transactionData, passphrase)
       transaction.setSignature(signature)
       res.status('200').json(transaction)
-      return
     }
     else {
-      res.statusMessage = 'Could Not Sign Transaction: Passphrase Incorrect'
-      res.status('400').end()
-      return
+      throw new ApiError(404, 'Accounts Not Found')
     }
   }
-  else {
-    res.statusMessage = "Accounts Not Found"
-    res.status('404').end()
-    return
+  catch(error) {
+    console.log(error)
+    res.statusMessage = error.statusMessage
+    res.status(error.statusCode).end()
   }
 })
 
 router.post('/verify', (req, res) => {
   const data = req.body
   const transactionData = { to: data.to, from: data.from, amount: data.amount }
-  if (helper.verify(transactionData, ACCOUNTS[data.from].publicKey, data.signature)) {
-    data.isVerified = true
-    res.status('200').json(data)
-    return
-  }
-  else {
-    res.statusMessage = 'Transaction Unverified'
-    res.status('400').end()
-    return
+  try {
+    if (helper.verify(transactionData, ACCOUNTS[data.from].publicKey, data.signature)) {
+      data.isVerified = true
+      res.status('200').json(data)
+      return
+    }
+    else {
+      throw new ApiError(400, 'Transaction Unverified')
+    }
+  } 
+  catch(error) {
+    console.log(error)
+    res.statusMessage = error.statusMessage
+    res.status(error.statusCode).end()
   }
 })
 
@@ -91,31 +91,42 @@ router.post('/send', (req, res) => {
   const receiver = ACCOUNTS[data.to]
   const sender = ACCOUNTS[data.from]
   const amount = parseInt(data.amount)
-  if (receiver && sender) {
-    const senderBalance = sender.balance
 
-    if (senderBalance > amount) {
-      sender.balance -= amount
-      receiver.balance += amount
-      res.status('200').send('Transaction Successful.')
-    } 
+  try {
+    if (receiver && sender) {
+      const senderBalance = sender.balance
+  
+      if (senderBalance > amount) {
+        sender.balance -= amount
+        receiver.balance += amount
+        res.status('200').send('Transaction Successful')
+      } 
+      else {
+        throw new ApiError(400, 'Insufficient Funds')
+      }
+    }
     else {
-      res.status('400').send('Insufficient Funds.')
+      throw new ApiError(404, 'Accounts Not Found')
     }
   }
-  else {
-    res.statusMessage = 'Accounts Not Found'
-    res.status('404').end()
-    return
+  catch(error) {
+    console.log(error)
+    res.statusMessage = error.statusMessage
+    res.status(error.statusCode).end()
   }
 })
 
 router.get('/accounts', (req, res) => {
-  let accounts = []
-  for (key in ACCOUNTS) {
-    accounts.push(ACCOUNTS[key])
+  try {
+    let accounts = []
+    for (key in ACCOUNTS) {
+      accounts.push(ACCOUNTS[key])
+    }
+    res.status('200').json(accounts)
   }
-  res.status('200').json(accounts)
+  catch(error) {
+    console.log(error)
+  }
 })
 
 module.exports = router

@@ -1,5 +1,6 @@
 const crypto = require('crypto')
 const helper = require('../helpers')
+const ApiError = require('./apiError')
 
 class Account {
   #passphraseHash = null
@@ -18,7 +19,7 @@ class Account {
     if (this.#passphraseHash === passphraseHash) {
       return true
     }
-    return false
+    throw new ApiError(400, 'Passphrase Incorrect')
   }
   signTransaction(data, passphrase) {
     if (this.authenticatePassphrase(passphrase)) {
@@ -27,7 +28,7 @@ class Account {
       return signature
     }
     else {
-      return false
+      throw new ApiError(400, 'Passphrase Incorrect')
     }
   }
 }
